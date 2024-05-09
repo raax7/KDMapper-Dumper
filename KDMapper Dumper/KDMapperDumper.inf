@@ -1,0 +1,62 @@
+;
+; KDMapperDumper.inf
+;
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = System ; TODO: specify appropriate Class
+ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318} ; TODO: specify appropriate ClassGuid
+Provider    = %ManufacturerName%
+CatalogFile = KDMapperDumper.cat
+DriverVer   = ; TODO: set DriverVer in stampinf property pages
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 13
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+KDMapperDumper.sys = 1,,
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName% = Standard,NT$ARCH$.10.0...16299 ; %13% support introduced in build 16299
+
+[Standard.NT$ARCH$.10.0...16299]
+%KDMapperDumper.DeviceDesc% = KDMapperDumper_Device, Root\KDMapperDumper ; TODO: edit hw-id
+
+[KDMapperDumper_Device.NT]
+CopyFiles = File_Copy
+
+[File_Copy]
+KDMapperDumper.sys
+
+;-------------- Service installation
+[KDMapperDumper_Device.NT.Services]
+AddService = KDMapperDumper,%SPSVCINST_ASSOCSERVICE%, KDMapperDumper_Service_Inst
+
+; -------------- KDMapperDumper driver install sections
+[KDMapperDumper_Service_Inst]
+DisplayName    = %KDMapperDumper.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %13%\KDMapperDumper.sys
+
+[KDMapperDumper_Device.NT.Wdf]
+KmdfService = KDMapperDumper, KDMapperDumper_wdfsect
+
+[KDMapperDumper_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+SPSVCINST_ASSOCSERVICE = 0x00000002
+ManufacturerName = "<Your manufacturer name>" ;TODO: Replace with your manufacturer name
+DiskName = "KDMapperDumper Installation Disk"
+KDMapperDumper.DeviceDesc = "KDMapperDumper Device"
+KDMapperDumper.SVCDESC = "KDMapperDumper Service"
