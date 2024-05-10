@@ -25,6 +25,12 @@ extern "C" NTSTATUS DriverEntry(
     NTSTATUS Status;
     DriverObject->DriverUnload = Unload;
 
+    //
+    // This driver is not intended to be manually mapped.
+    // If you do use something like KDMapper to load this driver
+    // you will get a bugcheck on setting DriverObject->DriverUnload
+    // and on recieving a callback on ImageLoadCallback.
+    //
     Status = PsSetLoadImageNotifyRoutine(ImageLoadCallback);
     if (NT_SUCCESS(Status) == false)
     {

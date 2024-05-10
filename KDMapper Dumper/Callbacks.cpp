@@ -4,12 +4,12 @@
 #include "NT.h"
 #include "Utils.h"
 
-typedef NTSTATUS(*PFN_ORIGINAL_IO_CONTROL)(
+typedef NTSTATUS(*_IO_CONTROL)(
     _In_ PDEVICE_OBJECT DeviceObject,
     _In_ PIRP Irp
     );
 
-PFN_ORIGINAL_IO_CONTROL  OriginalIOControl = NULL;
+_IO_CONTROL OriginalIOControl = NULL;
 
 NTSTATUS hk_ControlIO(
     _In_ PDEVICE_OBJECT DeviceObject,
@@ -38,7 +38,7 @@ NTSTATUS hk_ControlIO(
 
     DBG("Dumping Memory! Source: 0x%p Destination: 0x%p Size: %d", Buffer->Source, Buffer->Destination, Buffer->Length);
 
-    NTSTATUS Status = DumpMemoryToDisk(L"KDMapperDumper", (PVOID)((UINT64)Buffer->Source - 0x400), Buffer->Length + 0x400);
+    NTSTATUS Status = DumpMemoryToDisk(L"KDMapperDumper", Buffer->Source, Buffer->Length);
     if (NT_SUCCESS(Status) == false)
     {
         DBG("Failed to dump memory - 0x%X", Status);
@@ -59,6 +59,10 @@ NTSTATUS hk_ControlIO(
     //
     // Attempt to dump the original driver with the PE header by attaching to the source process
     // and then going back 0x1000 bytes from the mapped driver.
+    // 
+    // This abuses the fact that when KDMapper sends the IOCTL request, it just adjusts
+    // the base address of the data it sends to the driver to skip the PE header.
+    // This means we can just go back 0x1000 bytes from the base address to get the PE header.
     //
     PVOID Pool = ExAllocatePool2(POOL_FLAG_NON_PAGED, Buffer->Length + 0x1000, POOL_TAG2);
     if (Pool == NULL)
@@ -184,7 +188,8 @@ VOID ImageLoadCallback(
         return;
 
     //
-    // Copy the first 0x1000 bytes of the image to an allocated pool buffer.
+    // Copy the first 0x1000 bytes of the image (the PE header) to a pool buffer.
+    // If the image size is less than 0x1000 bytes, we will just copy the entire image.
     //
     PVOID ImageBase = ImageInfo->ImageBase;
     SIZE_T PoolSize = min(ImageInfo->ImageSize, 0x1000);
@@ -199,7 +204,8 @@ VOID ImageLoadCallback(
     RtlCopyMemory(ImageBuffer, ImageBase, PoolSize);
 
     //
-    // Check the file header timestamp to see if it matches the timestamp of the KDMapper driver.
+    // Check the file header timestamp to see if it matches the timestamp of the
+    // vulnerable Intel LAN driver that KDMapper uses.
     //
     PIMAGE_DOS_HEADER DosHeader = (PIMAGE_DOS_HEADER)ImageBuffer;
     if (DosHeader->e_magic != IMAGE_DOS_SIGNATURE)
@@ -217,11 +223,15 @@ VOID ImageLoadCallback(
 
     DBG("Found Intel LAN driver at: 0x%p", ImageBase);
 
+    //
+    // Hook IoCreateDevice() so we can redirect all IOCTL requests to
+    // our own handler that will dump the memory.
+    //
     NTSTATUS Status = HookIATEntry(ImageBase, "ntoskrnl.exe", "IoCreateDevice", hk_IoCreateDevice);
     if (NT_SUCCESS(Status) == false)
     {
         DBG("Failed to hook IoCreateDevice() in Intel LAN Driver! - 0x%X", Status);
     }
 
-    return;
+    ExFreePoolWithTag(ImageBuffer, POOL_TAG);
 }

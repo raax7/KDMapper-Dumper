@@ -35,6 +35,7 @@ typedef union _virt_addr_t
 } virt_addr_t, * pvirt_addr_t;
 
 #define POOL_TAG 'KDM '
-#define POOL_TAG2 'KDM2'
+#define POOL_TAG2 'KDM1'
+#define POOL_TAG3 'KDM2'
 
 #define DBG(Message, ...) DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "[KDMapper Dumper] " __FUNCTION__ "() - " Message "\n", __VA_ARGS__)

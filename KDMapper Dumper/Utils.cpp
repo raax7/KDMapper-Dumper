@@ -5,6 +5,7 @@
 
 #pragma warning(disable: 4244)
 
+// credit: https://github.com/uefibootkit/kdmapper-dumper
 NTSTATUS DumpMemoryToDisk(
     _In_ const WCHAR* FileNamePrefix,
     _In_ PVOID BaseAddress,
@@ -16,38 +17,35 @@ NTSTATUS DumpMemoryToDisk(
         return STATUS_INVALID_PARAMETER;
     }
 
-    HANDLE             h_file;
-    UNICODE_STRING     name;
-    OBJECT_ATTRIBUTES  attr;
-    IO_STATUS_BLOCK    status_block;
-    LARGE_INTEGER      offset{ NULL };
+    HANDLE File;
+    UNICODE_STRING FileNameUnicode;
+    OBJECT_ATTRIBUTES Attributes;
+    IO_STATUS_BLOCK StatusBlock;
+    LARGE_INTEGER Offset{ NULL };
 
     //
-    // Get the current kernel time and use that as the filen name.
+    // Get the current system time and use that in the file name.
     //
     LARGE_INTEGER CurrentTime;
     KeQuerySystemTime(&CurrentTime);
 
-    //
-    // Create the file name using the current time.
-    //
     WCHAR FileName[260];
     swprintf(FileName, L"\\??\\C:\\%s_%lld.bin", FileNamePrefix, CurrentTime.QuadPart);
 
     //
     // Initialize the unicode string.
     //
-    RtlInitUnicodeString(&name, FileName);
-    InitializeObjectAttributes(&attr, &name,
+    RtlInitUnicodeString(&FileNameUnicode, FileName);
+    InitializeObjectAttributes(&Attributes, &FileNameUnicode,
         OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
         NULL, NULL
     );
 
     NTSTATUS Status = ZwCreateFile(
-        &h_file,
+        &File,
         GENERIC_WRITE,
-        &attr,
-        &status_block,
+        &Attributes,
+        &StatusBlock,
         NULL,
         FILE_ATTRIBUTE_NORMAL,
         NULL,
@@ -63,14 +61,14 @@ NTSTATUS DumpMemoryToDisk(
     }
 
     Status = ZwWriteFile(
-        h_file,
+        File,
         NULL,
         NULL,
         NULL,
-        &status_block,
+        &StatusBlock,
         BaseAddress,
         Size,
-        &offset,
+        &Offset,
         NULL
     );
     if (NT_SUCCESS(Status) == false)
@@ -78,6 +76,6 @@ NTSTATUS DumpMemoryToDisk(
         DBG("Failed to write to file - 0x%X", Status);
     }
 
-    ZwClose(h_file);
+    ZwClose(File);
     return Status;
 }
