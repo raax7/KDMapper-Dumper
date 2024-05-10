@@ -1,5 +1,3 @@
-# KDMapper-Dumper
-
 ## Features
 Dumps drivers mapped with KDMapper, along with their PE header.
 
